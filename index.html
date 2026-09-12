@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>SQL Daily</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg:#ffffff; --line:#dcdcdc; --line-soft:#eee;
+    --text:#1e1e1e; --muted:#6b6b6b; --faint:#9a9a9a;
+    --btn:#f3f3f3; --btn-line:#c8c8c8;
+    --accent:#0a6ebd;
+    --kw:#0000ff; --com:#008000;
+    --danger:#c0392b; --ok:#2f7d32;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'JetBrains Mono',ui-monospace,'Consolas',monospace;
+    display:flex; flex-direction:column;
+    max-width:520px; margin:0 auto;
+    min-height:100dvh;
+  }
+  /* system font for UI chrome (labels/buttons) keeps it clean; mono for content */
+  .ui{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+
+  /* top app bar (fixed) */
+  .topbar{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;
+    border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:30;
+  }
+  .tb-title{font-size:15px;font-weight:700;}
+  .hamb{
+    width:38px;height:38px;border:1px solid var(--line);border-radius:9px;background:#fff;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;cursor:pointer;
+  }
+  .hamb span{display:block;width:18px;height:2px;background:var(--text);border-radius:2px;}
+
+  .screen{flex:1; overflow-y:auto; padding:16px 16px calc(16px + env(safe-area-inset-bottom));}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* drawer + overlay */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40;}
+  .overlay.open{opacity:1;pointer-events:auto;}
+  .drawer{
+    position:fixed;top:0;right:0;height:100%;width:250px;max-width:80%;
+    background:#fff;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.12);
+    transform:translateX(100%);transition:transform .22s ease;z-index:50;
+    display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 14px) 0 0;
+  }
+  .drawer.open{transform:translateX(0);}
+  .drawer .dh{padding:0 18px 14px;font-size:13px;color:var(--faint);border-bottom:1px solid var(--line-soft);}
+  .drawer .di{
+    display:flex;align-items:center;gap:12px;padding:16px 18px;font-size:15px;font-weight:600;
+    color:var(--text);cursor:pointer;border-bottom:1px solid var(--line-soft);
+  }
+  .drawer .di.on{color:var(--accent);background:#f5f9fd;}
+  .drawer .di svg{width:20px;height:20px;}
+
+  /* header inside Today */
+  .apphead{display:flex;align-items:center;justify-content:space-between;padding:4px 2px 16px;}
+  .apphead .name{font-size:15px;font-weight:700;}
+  .apphead .day{font-size:12px;color:var(--muted);}
+
+  /* question card (small, top) */
+  .card{
+    background:#fff;border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
+    padding:16px 16px 14px;margin-bottom:14px;
+  }
+  .meta{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:#eef4fb;color:var(--accent);}
+  .tag.g{background:#eef7ee;color:var(--ok);}
+  .qtext{font-size:14.5px;line-height:1.55;margin-bottom:16px;}
+
+  .row{display:flex;gap:8px;}
+  .btn{
+    flex:1;padding:11px;border-radius:7px;font-size:13.5px;font-weight:600;cursor:pointer;
+    transition:.12s;border:1px solid var(--btn-line);background:#fff;color:var(--text);
+  }
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn-skip{background:var(--btn);color:var(--muted);}
+
+  .answer{margin-top:14px;}
+  .qpane{
+    background:#fff;border:1px solid var(--line);border-radius:6px;
+    padding:12px 14px;font-size:13.5px;line-height:1.7;white-space:pre;overflow-x:auto;color:#000;
+  }
+  .qpane::-webkit-scrollbar{height:0;}
+  .kw{color:var(--kw);} .com{color:var(--com);}
+  .exp{margin-top:12px;font-size:13px;line-height:1.6;color:var(--muted);}
+  .exp b{color:var(--text);font-weight:600;}
+
+  .rate{margin-top:14px;}
+  .rate .q{font-size:13px;color:var(--muted);margin-bottom:8px;}
+  .rate-row{display:flex;gap:6px;}
+  .r{flex:1;padding:9px 0;border-radius:6px;border:1px solid var(--btn-line);background:#fff;
+     font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text);}
+  .r:active{transform:scale(.97);}
+
+  .up-next{font-size:12px;color:var(--faint);margin:18px 4px 6px;}
+  .mini{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--line-soft);font-size:13px;color:var(--muted);}
+  .mini .n{width:20px;color:var(--faint);flex:0 0 auto;text-align:center;}
+  .mini.done .n{color:var(--ok);}
+
+  /* done state */
+  .done{text-align:center;padding:40px 16px;}
+  .done .big{font-size:44px;margin-bottom:12px;}
+  .done h2{font-size:18px;margin-bottom:6px;}
+  .done p{color:var(--muted);font-size:13px;margin-bottom:22px;}
+
+  .empty{color:var(--muted);font-size:13.5px;line-height:1.6;padding:24px 4px;text-align:center;}
+
+  /* progress */
+  .p-title{font-size:18px;font-weight:700;margin:4px 2px 18px;}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:8px;padding:18px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+  .stat .num{font-size:26px;font-weight:700;}
+  .stat .num.a{color:var(--accent);}
+  .stat .lbl{font-size:12px;color:var(--muted);text-align:right;}
+  .lvbar{display:flex;gap:6px;margin-top:4px;}
+  .lv{flex:1;text-align:center;padding:9px 0;border-radius:6px;font-size:11.5px;font-weight:600;background:#f3f3f3;color:var(--faint);border:1px solid var(--line);}
+  .lv.on{background:#eef4fb;color:var(--accent);border-color:var(--accent);}
+
+  /* settings */
+  .set-row{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .set-row .k{font-size:13.5px;}
+  .set-row .k small{display:block;color:var(--faint);font-size:11px;margin-top:3px;}
+  .seg{display:flex;gap:4px;background:#f3f3f3;border:1px solid var(--line);border-radius:8px;padding:3px;flex:0 0 auto;}
+  .seg span{padding:6px 10px;border-radius:6px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .seg span.on{background:var(--accent);color:#fff;}
+  select,input[type=time]{font-family:inherit;font-size:13px;border:1px solid var(--btn-line);border-radius:6px;padding:7px 8px;background:#fff;color:var(--text);}
+  .toggle{width:44px;height:26px;border-radius:99px;position:relative;cursor:pointer;background:#ccc;transition:.15s;flex:0 0 auto;}
+  .toggle.on{background:var(--accent);}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:99px;transition:.15s;}
+  .toggle.on::after{left:21px;}
+  .schema{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:10px;}
+  .schema .lbl{font-size:11px;color:var(--faint);margin-bottom:8px;}
+  .schema code{display:block;font-size:12px;line-height:1.9;color:#333;white-space:pre;overflow-x:auto;}
+  .link-danger{color:var(--danger);font-weight:600;cursor:pointer;}
+
+
+</style>
+</head>
+<body class="ui">
+
+  <div class="topbar">
+    <div class="tb-title" id="tbTitle">SQL Daily</div>
+    <button class="hamb" onclick="UI.openDrawer()" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+
+  <div class="screen">
+    <!-- TODAY -->
+    <div class="view active" id="view-today"></div>
+    <!-- PROGRESS -->
+    <div class="view" id="view-progress"></div>
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings"></div>
+  </div>
+
+  <!-- slide-in menu -->
+  <div class="overlay" id="overlay" onclick="UI.closeDrawer()"></div>
+  <nav class="drawer" id="drawer">
+    <div class="dh">Menu</div>
+    <div class="di on" data-tab="today" onclick="UI.go('today')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Today</span>
+    </div>
+    <div class="di" data-tab="progress" onclick="UI.go('progress')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Progress</span>
+    </div>
+    <div class="di" data-tab="settings" onclick="UI.go('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
+  </nav>
+
+  <!-- course loader (auto-discovery) + core -->
+  <script src="content/loader.js"></script>
+  <script src="app.js"></script>
+  <!-- ui -->
+  <script>
+  var UI = (function () {
+    var current = "today";
+    var revealed = false;
+
+    function esc(s){ return String(s).replace(/[&<>]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+
+    /* very light SQL highlighter for the answer pane */
+    var KW = ["SELECT","FROM","WHERE","ORDER","BY","GROUP","HAVING","JOIN","LEFT","RIGHT","INNER","OUTER","ON","AND","OR","NOT","IN","IS","NULL","AS","DISTINCT","TOP","PERCENT","BETWEEN","LIKE","ASC","DESC","INSERT","INTO","VALUES","UPDATE","SET","DELETE","COUNT","SUM","AVG","MIN","MAX","CASE","WHEN","THEN","ELSE","END","WITH","OVER","PARTITION","ROW_NUMBER","RANK","DENSE_RANK","NTILE","LAG","LEAD","FIRST_VALUE","EXISTS","UNION","ALL","COALESCE","CROSS","APPLY","PIVOT","FOR","ROWS","BETWEEN","PRECEDING","CURRENT","GROUPING","SETS"];
+    function highlight(sql){
+      var out = esc(sql);
+      // keywords (word boundaries, case-insensitive)
+      out = out.replace(/\b([A-Z_]{2,})\b/gi, function(m){
+        return KW.indexOf(m.toUpperCase()) !== -1
+          ? '<span class="kw">'+m+'</span>' : m;
+      });
+      return out;
+    }
+
+    var TITLES = { today:null, progress:"Progress", settings:"Settings" };
+
+    function openDrawer(){
+      document.getElementById("drawer").classList.add("open");
+      document.getElementById("overlay").classList.add("open");
+    }
+    function closeDrawer(){
+      document.getElementById("drawer").classList.remove("open");
+      document.getElementById("overlay").classList.remove("open");
+    }
+
+    function go(tab){
+      current = tab;
+      ["today","progress","settings"].forEach(function(t){
+        document.getElementById("view-"+t).classList.toggle("active", t===tab);
+      });
+      document.querySelectorAll(".di").forEach(function(el){
+        el.classList.toggle("on", el.getAttribute("data-tab")===tab);
+      });
+      // top bar title: course name on Today, section name elsewhere
+      var c = App.getCourse();
+      document.getElementById("tbTitle").textContent =
+        TITLES[tab] || (c ? c.name : "SQL Daily");
+      closeDrawer();
+      document.querySelector(".screen").scrollTop = 0;
+      render();
+    }
+
+    function render(){
+      if (current==="today") renderToday();
+      else if (current==="progress") renderProgress();
+      else renderSettings();
+    }
+
+    /* ---------------- TODAY ---------------- */
+    function renderToday(){
+      var el = document.getElementById("view-today");
+      var c = App.getCourse();
+      var day = App.getDayNumber();
+      var target = App.getTarget();
+      var done = App.getCompleted();
+      var q = App.getCurrentQuestion();
+
+      var head =
+        '<div class="apphead">'+
+          '<div class="day">Day '+day+'</div>'+
+          '<div class="day">'+Math.min(done,target)+' of '+target+'</div>'+
+        '</div>';
+
+      // No current question => either done for today, or nothing for this level.
+      if (!q){
+        if (done > 0){
+          var moreBtn = App.hasMoreAvailable()
+            ? '<button class="btn btn-primary" onclick="UI.keepGoing()">Keep practicing</button>'
+            : '<div class="empty">No more questions available right now. Come back tomorrow.</div>';
+          el.innerHTML = head +
+            '<div class="done">'+
+              '<div class="big">✅</div>'+
+              '<h2>Done for today</h2>'+
+              '<p>You finished your '+target+' question'+(target>1?'s':'')+'. Nice work.</p>'+
+              moreBtn +
+            '</div>';
+        } else {
+          // level empty / fresh edge
+          el.innerHTML = head + '<div class="empty">No questions for this level yet.<br>Try another level in Settings.</div>';
+        }
+        return;
+      }
+
+      var answerHtml = revealed ? (
+        '<div class="answer">'+
+          '<div class="qpane">'+ highlight(q.answer) +'</div>'+
+          '<div class="exp">'+ esc(q.explanation) +'</div>'+
+          '<div class="rate">'+
+            '<div class="q">How was it?</div>'+
+            '<div class="rate-row">'+
+              '<button class="r" onclick="UI.rate(\'Easy\')">Easy</button>'+
+              '<button class="r" onclick="UI.rate(\'Medium\')">Medium</button>'+
+              '<button class="r" onclick="UI.rate(\'Hard\')">Hard</button>'+
+              '<button class="r" onclick="UI.rate(\'Review Later\')">Later</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>'
+      ) : (
+        '<div class="row">'+
+          '<button class="btn btn-skip" onclick="UI.skip()">Skip</button>'+
+          '<button class="btn btn-primary" onclick="UI.reveal()">Show Answer</button>'+
+        '</div>'
+      );
+
+      var card =
+        '<div class="card">'+
+          '<div class="meta">'+
+            '<span class="tag">'+ esc(q.topic) +'</span>'+
+            '<span class="tag g">'+ cap(q.difficulty) +'</span>'+
+          '</div>'+
+          '<div class="qtext">'+ esc(q.question) +'</div>'+
+          answerHtml +
+        '</div>';
+
+      // up next
+      var upNext = App.getUpNext();
+      var upHtml = "";
+      if (upNext.length){
+        upHtml = '<div class="up-next">Up next today</div>';
+        upNext.forEach(function(nq, i){
+          upHtml += '<div class="mini"><span class="n">'+(i+1)+'</span>'+ esc(nq.question) +'</div>';
+        });
+      }
+
+      el.innerHTML = head + card + upHtml;
+    }
+
+    function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+    function reveal(){ revealed = true; renderToday(); }
+    function skip(){ revealed = false; App.skip(); renderToday(); }
+    function rate(r){ revealed = false; App.rate(r); renderToday(); }
+    function keepGoing(){ App.keepPracticing(); revealed=false; renderToday(); }
+
+    /* ---------------- PROGRESS ---------------- */
+    function renderProgress(){
+      var el = document.getElementById("view-progress");
+      var st = App.getState();
+      var lvls = ["beginner","intermediate","advanced"];
+      var lvHtml = lvls.map(function(l){
+        return '<div class="lv'+(st.currentLevel===l?' on':'')+'">'+cap(l)+'</div>';
+      }).join("");
+
+      el.innerHTML =
+        '<div class="p-title">Progress</div>'+
+        '<div class="stat"><div class="num a">'+App.getDayNumber()+'</div><div class="lbl">Current day</div></div>'+
+        '<div class="stat"><div class="num">'+st.totalAnswered+'</div><div class="lbl">Questions answered</div></div>'+
+        '<div class="stat" style="flex-direction:column;align-items:stretch;">'+
+          '<div class="lbl" style="text-align:left;margin-bottom:10px;">SQL level (change in Settings)</div>'+
+          '<div class="lvbar">'+lvHtml+'</div>'+
+        '</div>';
+    }
+
+    /* ---------------- SETTINGS ---------------- */
+    function renderSettings(){
+      var el = document.getElementById("view-settings");
+      var s = App.getSettings();
+      var st = App.getState();
+      var c = App.getCourse();
+
+      var perDay = [1,3,5,10].map(function(n){
+        return '<span class="'+(s.questionsPerDay===n?'on':'')+'" onclick="UI.setPerDay('+n+')">'+n+'</span>';
+      }).join("");
+
+      var levelOpts = ["beginner","intermediate","advanced"].map(function(l){
+        return '<option value="'+l+'"'+(st.currentLevel===l?' selected':'')+'>'+cap(l)+'</option>';
+      }).join("");
+
+      var courseOpts = window.getAllCourses().map(function(cp){
+        return '<option value="'+cp.id+'"'+(st.activeCourse===cp.id?' selected':'')+'>'+cp.name+'</option>';
+      }).join("");
+
+      var schemaHtml = "";
+      if (c && c.schema){
+        schemaHtml =
+          '<div class="schema">'+
+            '<div class="lbl">Sample database ('+c.name+')</div>'+
+            '<code>'+ c.schema.map(esc).join("\n") +'</code>'+
+          '</div>';
+      }
+
+      el.innerHTML =
+        '<div class="p-title">Settings</div>'+
+
+        '<div class="set-row"><div class="k">Questions per day</div>'+
+          '<div class="seg">'+perDay+'</div></div>'+
+
+        '<div class="set-row"><div class="k">Level<small>Move up when you feel ready</small></div>'+
+          '<select onchange="UI.setLevel(this.value)">'+levelOpts+'</select></div>'+
+
+        '<div class="set-row"><div class="k">Course</div>'+
+          '<select onchange="UI.setCourse(this.value)">'+courseOpts+'</select></div>'+
+
+        '<div class="set-row"><div class="k">Daily reminder</div>'+
+          '<div class="toggle'+(s.notificationsEnabled?' on':'')+'" onclick="UI.toggleNotif()"></div></div>'+
+
+        '<div class="set-row"><div class="k">Reminder time</div>'+
+          '<input type="time" value="'+s.notificationTime+'" onchange="UI.setTime(this.value)"></div>'+
+
+        schemaHtml +
+
+        '<div class="set-row"><div class="k link-danger" onclick="UI.reset()">Reset progress</div>'+
+          '<span class="link-danger">›</span></div>';
+    }
+
+    /* settings actions */
+    function setPerDay(n){ App.setQuestionsPerDay(n); renderSettings(); }
+    function setLevel(l){ App.setLevel(l); renderSettings(); }
+    function setCourse(id){ App.setCourse(id); revealed=false; renderSettings(); }
+    function setTime(t){ App.setNotifications(App.getSettings().notificationsEnabled, t); App.scheduleReminder(); }
+    function toggleNotif(){
+      var s = App.getSettings();
+      var next = !s.notificationsEnabled;
+      if (next){
+        App.requestNotificationPermission().then(function(perm){
+          if (perm==="granted"){ App.setNotifications(true); App.scheduleReminder(); }
+          else { App.setNotifications(false); alert("Notifications are blocked. Enable them for this app in your browser settings."); }
+          renderSettings();
+        });
+      } else {
+        App.setNotifications(false); App.scheduleReminder(); renderSettings();
+      }
+    }
+    function reset(){
+      if (confirm("Reset all progress? This cannot be undone.")){
+        App.resetProgress(); revealed=false; renderSettings();
+      }
+    }
+
+    return {
+      go:go, render:render, openDrawer:openDrawer, closeDrawer:closeDrawer,
+      reveal:reveal, skip:skip, rate:rate, keepGoing:keepGoing,
+      setPerDay:setPerDay, setLevel:setLevel, setCourse:setCourse,
+      setTime:setTime, toggleNotif:toggleNotif, reset:reset
+    };
+  })();
+
+  /* boot — wait until the loader has discovered & loaded the courses */
+  function boot(){
+    App.init();
+    UI.go("today");
+    App.scheduleReminder();
+  }
+  if (window.__COURSES_READY){ boot(); }
+  else { window.addEventListener("courses-ready", boot, { once:true }); }
+
+  /* register service worker for offline + installability */
+  if ("serviceWorker" in navigator){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  }
+  </script>
+</body>
+</html>
